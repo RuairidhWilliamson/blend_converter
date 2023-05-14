@@ -5,6 +5,8 @@
 
 Converts blend files to other 3D formats.
 
+There aren't any export options exposed yet, but I plan to add these when needed or someone asks. https://docs.blender.org/api/current/bpy.ops.export_scene.html
+
 ## Build Script
 You can use this in your build script to automatically convert blender files when they change. To do so your build script should look something like:
 
