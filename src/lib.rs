@@ -45,6 +45,7 @@
 //!
 
 use std::env;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 use walkdir::WalkDir;
@@ -109,6 +110,12 @@ impl ConversionOptions {
                 }
 
                 let input_path = entry.path();
+
+                // Ignore everything except blend files
+                if input_path.extension() != Some(OsStr::new("blend")) {
+                    continue;
+                }
+
                 let base;
                 if let Some(entry_parent) = input_path.parent() {
                     base = entry_parent;
@@ -253,8 +260,8 @@ pub enum Error {
     /// Could not locate blender executable, see [`BlenderExecutable`] for the search strategy
     #[error("could not locate blender executable, is blender in your path?")]
     MissingBlenderExecutable,
-    /// Invalid input file blend
-    #[error("invalid input path {0:?}")]
+    /// Invalid input file blend. This error occurs when the file extension is not .blend
+    #[error("invalid input path {0:?}, path must have .blend file extension")]
     InvalidInputFile(PathBuf),
     /// Export failed with exit code
     #[error("export failed with exit code {0}")]
