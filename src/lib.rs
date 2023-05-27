@@ -59,6 +59,9 @@ pub struct ConversionOptions {
     /// [`BlenderExecutable::find`] will be used. Read the documentation there for the search
     /// strategy.
     pub blender_path: Option<PathBuf>,
+    /// Apply modifiers exclusing Armatures to mesh objects. Prevents exporting shape keys.
+    /// Defaults to false
+    pub apply_modifiers: bool,
 }
 
 /// The output file format to export to
@@ -76,14 +79,23 @@ pub enum OutputFormat {
     GltfSeparate,
 }
 
-impl OutputFormat {
+impl ConversionOptions {
     fn export_script(&self, file_path: &Path) -> String {
-        let format = match self {
-            Self::Glb => "GLB",
-            Self::GltfEmbedded => "GLTF_EMBEDDED",
-            Self::GltfSeparate => "GLTF_SEPARATE",
+        let format = match &self.output_format {
+            OutputFormat::Glb => "GLB",
+            OutputFormat::GltfEmbedded => "GLTF_EMBEDDED",
+            OutputFormat::GltfSeparate => "GLTF_SEPARATE",
         };
-        format!("import bpy; bpy.ops.export_scene.gltf(filepath={file_path:?}, check_existing=False, export_format={format:?})")
+        let apply_modifiers = format_py_bool(self.apply_modifiers);
+        format!("import bpy; bpy.ops.export_scene.gltf(filepath={file_path:?}, check_existing=False, export_format={format:?}, export_apply={apply_modifiers})")
+    }
+}
+
+fn format_py_bool(val: bool) -> &'static str {
+    if val {
+        "True"
+    } else {
+        "False"
     }
 }
 
@@ -184,7 +196,7 @@ impl ConversionOptions {
             .arg("-b")
             .arg(input_file_path)
             .arg("--python-expr")
-            .arg(self.output_format.export_script(output))
+            .arg(self.export_script(output))
             .status()?;
 
         if status.success() {
