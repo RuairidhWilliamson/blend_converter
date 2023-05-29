@@ -5,6 +5,9 @@ version = "0.3.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/RuairidhWilliamson/blend_converter"
+exclude = [
+    "*.blend",
+]
 
 [dependencies]
 thiserror = "1"

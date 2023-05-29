@@ -36,7 +36,7 @@
 //! ```
 //! Then assuming you have `blends/test.blend`, in your code you can open the converted files using something like:
 //!
-//! ```no_run
+//! ```ignore
 //! use std::path::Path;
 //!
 //! let path = Path::new(env!("OUT_DIR")).join("blends").join("test.glb");
@@ -51,7 +51,7 @@ use std::process::{Command, ExitStatus};
 use walkdir::WalkDir;
 
 /// ConversionOptions describe how blender files should be converted
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ConversionOptions {
     /// Ouput format is the desired file format to convert to
     pub output_format: OutputFormat,
@@ -59,9 +59,27 @@ pub struct ConversionOptions {
     /// [`BlenderExecutable::find`] will be used. Read the documentation there for the search
     /// strategy.
     pub blender_path: Option<PathBuf>,
-    /// Apply modifiers exclusing Armatures to mesh objects. Prevents exporting shape keys.
-    /// Defaults to false
+    /// Checks if the export path file already exists and does not overwrite it.
+    pub check_existing: bool,
+    /// Apply modifiers exclusing Armatures to mesh objects. Prevents exporting shape keys. Defaults to false.
     pub apply_modifiers: bool,
+    /// Export custom properties as glTF extras. Defaults to false.
+    pub extras: bool,
+    /// Export using +Y as up instead of blender's +Z. Defaults to true.
+    pub yup: bool,
+}
+
+impl Default for ConversionOptions {
+    fn default() -> Self {
+        Self {
+            output_format: OutputFormat::default(),
+            check_existing: false,
+            blender_path: None,
+            apply_modifiers: false,
+            extras: false,
+            yup: true,
+        }
+    }
 }
 
 /// The output file format to export to
@@ -86,8 +104,20 @@ impl ConversionOptions {
             OutputFormat::GltfEmbedded => "GLTF_EMBEDDED",
             OutputFormat::GltfSeparate => "GLTF_SEPARATE",
         };
+        let check_existing = format_py_bool(self.check_existing);
         let apply_modifiers = format_py_bool(self.apply_modifiers);
-        format!("import bpy; bpy.ops.export_scene.gltf(filepath={file_path:?}, check_existing=False, export_format={format:?}, export_apply={apply_modifiers})")
+        let extras = format_py_bool(self.extras);
+        let yup = format_py_bool(self.yup);
+        format!(
+            "import bpy; bpy.ops.export_scene.gltf(
+                filepath={file_path:?},
+                export_format={format:?},
+                check_existing={check_existing},
+                export_apply={apply_modifiers},
+                export_extras={extras},
+                export_yup={yup},
+            )"
+        )
     }
 }
 
@@ -195,10 +225,13 @@ impl ConversionOptions {
             .cmd()
             .arg("-b")
             .arg(input_file_path)
+            .arg("--python-exit-code")
+            .arg("10")
             .arg("--python-expr")
             .arg(self.export_script(output))
             .status()?;
 
+        dbg!(status);
         if status.success() {
             Ok(())
         } else {
@@ -281,4 +314,17 @@ pub enum Error {
     /// IOError when exporting
     #[error("io error occurred: {0}")]
     IOError(#[from] std::io::Error),
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    #[test]
+    fn export_test_blend() {
+        let options = crate::ConversionOptions::default();
+        let export_path = Path::new(".").canonicalize().expect("abs path").join("test.glb");
+        options.convert(Path::new("./test.blend"), &export_path).expect("convert blend");
+        assert!(matches!(export_path.try_exists(), Ok(true)));
+    }
 }
